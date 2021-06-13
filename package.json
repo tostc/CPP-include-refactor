@@ -15,10 +15,21 @@
 	],
 	"main": "./out/extension.js",
 	"contributes": {
-		"commands": [
+		"configuration":[
 			{
-				"command": "cpp-include-refactor.helloWorld",
-				"title": "Hello World"
+				"title": "C++ include refactor",
+				"properties": {
+					"cppIncludeRefactor.excludeDirs": {
+						"type":"array",
+						"default": ["external", "externals", "third_party", "third_parties"],
+						"description": "These folders will not be scanned for refactoring."
+					},
+					"cppIncludeRefactor.removeFolderFromPath": {
+						"type":"array",
+						"default":["src", "inc", "include"],
+						"description": "These folders will be removed from the '#include' during refactoring."
+					}
+				}
 			}
 		]
 	},
