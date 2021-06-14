@@ -1,19 +1,33 @@
 {
   "name": "cpp-include-refactor",
 	"displayName": "C++ include refactor",
-	"description": "Refactors all includes if you move a file.",
-	"version": "0.0.1",
+	"description": "Refactors all includes if you move or rename a file or directory.",
+	"version": "1.0.0",
 	"engines": {
 		"vscode": "^1.57.0"
 	},
 	"publisher": "tostc",
 	"categories": [
-		"Other"
+		"Formatters"
 	],
+	"keywords": [
+		"C",
+		"C++",
+		"refactoring",
+		"refactor",
+		"header",
+		"multi-root ready"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/tostc/CPP-include-refactor"
+	},
+	"homepage": "https://github.com/tostc/CPP-include-refactor",
 	"activationEvents": [
-        "onLanguage:cpp"
+        "*"
 	],
 	"main": "./out/extension.js",
+	"icon": "images/icon.png",
 	"contributes": {
 		"configuration":[
 			{

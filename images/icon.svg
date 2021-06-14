@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="256"
+   height="256"
+   viewBox="0 0 67.733332 67.733335"
+   version="1.1"
+   id="svg5"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs2" />
+  <g
+     id="layer1">
+    <ellipse
+       style="fill:#659bd3;fill-opacity:1;stroke-width:0.264998"
+       id="path31"
+       cx="33.866665"
+       cy="33.866665"
+       rx="33.866669"
+       ry="33.866665" />
+    <path
+       id="path27943"
+       style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:5.00001;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+       d="M 12.441406 73 A 128.00001 127.99999 0 0 0 0 128 A 128.00001 127.99999 0 0 0 12.441406 183 L 243.55859 183 A 128.00001 127.99999 0 0 0 256 128 A 128.00001 140.79999 0 0 0 255.82617 121.34766 A 128.00001 127.99999 0 0 0 243.57227 73 L 12.441406 73 z "
+       transform="scale(0.26458333)" />
+    <path
+       id="rect1044"
+       style="fill:#ffffff;fill-opacity:1;stroke-width:5.00000006;stroke:none;stroke-opacity:1;stroke-miterlimit:4;stroke-dasharray:none;paint-order:normal"
+       d="M 10.259766 78 A 128.00001 127.99999 0 0 0 0 128 A 128.00001 127.99999 0 0 0 10.259766 178 L 245.74023 178 A 128.00001 127.99999 0 0 0 256 128 A 128.00001 127.99999 0 0 0 245.82031 78 L 10.259766 78 z "
+       transform="scale(0.26458333)" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:14.1111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="4.9742384"
+       y="37.535553"
+       id="text2587"><tspan
+         id="tspan2585"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:14.1111px;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans Bold';stroke-width:0.264583"
+         x="4.9742384"
+         y="37.535553">.h / .hpp</tspan></text>
+  </g>
+</svg>
