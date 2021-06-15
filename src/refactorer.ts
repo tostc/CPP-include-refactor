@@ -1,50 +1,75 @@
 import path = require("path");
-import { FileType, Range, RelativePattern, Uri, window, workspace } from "vscode";
+import { commands, FileType, Range, RelativePattern, TextDocument, Uri, ViewColumn, window, workspace } from "vscode";
 import { Settings } from "./settings";
 
 export class Refactorer {
-    private static headerFileExtRegex = new RegExp(".(hpp|h|hxx)$");
+    private static _HeaderFileExtRegex = new RegExp(".(hpp|h|hxx)$");
+
+    private _CurrentTextDocument : TextDocument | null = null;
 
     /**
      * @brief Begins the refactoring process of all the source files.
      * @param renamedFiles Files or folder which have been moved or renamed.
      */
     public async refactor(renamedFiles : ReadonlyArray<{ readonly oldUri: Uri, readonly newUri: Uri }>) : Promise<void> {
+        await this.refactorIncludes(await this.createIncludeFileList(renamedFiles));
+    }
+    
+    /**
+     * @param renamedFiles 
+     * @returns Returns an array of files, including files which are inside directories.
+     */
+    private async createIncludeFileList(renamedFiles : ReadonlyArray<{ readonly oldUri: Uri, readonly newUri: Uri }>) : Promise<{ oldUri: Uri, newUri: Uri }[]> {
+        let ret : { oldUri: Uri, newUri: Uri }[] = [];
+        
         for (const renamedFile of renamedFiles) {
             try {
                 if((await workspace.fs.stat(renamedFile.newUri)).type == FileType.Directory) {
                     // TODO: Scan dir for files.
                     let files = await workspace.fs.readDirectory(renamedFile.newUri);
-                    for (const file of files)
-                        await this.refactorIncludes({oldUri: Uri.file(path.join(renamedFile.oldUri.fsPath, file[0])), newUri: Uri.file(path.join(renamedFile.newUri.fsPath, file[0]))});
+                    for (const file of files) {
+                        // We also want subdirectories.
+                        if((await workspace.fs.stat(Uri.file(path.join(renamedFile.newUri.fsPath, file[0])))).type == FileType.Directory) {
+                            let tmp = await this.createIncludeFileList([{oldUri: Uri.file(path.join(renamedFile.oldUri.fsPath, file[0])), newUri: Uri.file(path.join(renamedFile.newUri.fsPath, file[0]))}]);
+                            ret.push(...tmp);
+                        }
+                        else
+                            ret.push({oldUri: Uri.file(path.join(renamedFile.oldUri.fsPath, file[0])), newUri: Uri.file(path.join(renamedFile.newUri.fsPath, file[0]))});
+                    }
                 } 
                 else 
-                    await this.refactorIncludes(renamedFile);
+                    ret.push(renamedFile);
             } catch (error) {
                 window.showErrorMessage("Unable to read file: " + renamedFile.newUri.fsPath);
             }
         }
+        
+        return ret;
     }
 
     /**
      * @brief Searches for source files which includes the given file.
      * @param renamedFile 
      */
-    private async refactorIncludes(renamedFile : { readonly oldUri: Uri, readonly newUri: Uri }) : Promise<void> {
-        // Only C/C++ header will be processed.
-        if(Refactorer.headerFileExtRegex.test(renamedFile.newUri.fsPath) || Refactorer.headerFileExtRegex.test(renamedFile.oldUri.fsPath)) {
-            // TODO: Find the correct workspace.
-            const folder = workspace.workspaceFolders![0];
-            const files = await workspace.findFiles(new RelativePattern(folder, "**/*.{hpp,h,hxx,c,cpp,cxx}"));
-            
-            for (const file of files) {
-                if(this.canIgnore(file))
-                    continue;
+    private async refactorIncludes(renamedFiles : { oldUri: Uri, newUri: Uri }[]) : Promise<void> {
+        // TODO: Find the correct workspace.
+        const folder = workspace.workspaceFolders![0];
+        const files = await workspace.findFiles(new RelativePattern(folder, "**/*.{hpp,h,hxx,c,cpp,cxx}"));
+        
+        for (const file of files) {
+            if(this.canIgnore(file))
+                continue;
 
-                if(this.isSameFile(file, renamedFile))
-                    await this.refactorMovedFile(renamedFile);
-                else
-                    await this.refactorFile(file, renamedFile);
+            this._CurrentTextDocument = await workspace.openTextDocument(file);
+
+            for (const renamedFile of renamedFiles) {
+                // Only C/C++ header will be processed.
+                if(Refactorer._HeaderFileExtRegex.test(renamedFile.newUri.fsPath) || Refactorer._HeaderFileExtRegex.test(renamedFile.oldUri.fsPath)) {
+                    if(this.isSameFile(file, renamedFile))
+                        await this.refactorMovedFile(renamedFile);
+                    else
+                        await this.refactorFile(file, renamedFile);
+                }
             }
         }
     }
@@ -56,13 +81,12 @@ export class Refactorer {
      * @returns 
      */
     private async refactorFile(file : Uri, renamedFile : { readonly oldUri: Uri, readonly newUri: Uri }) : Promise<void> {
-        let textDocument = await workspace.openTextDocument(file);
-
         // Gets the old header file name.
+        let current = window.activeTextEditor;
         let oldHeaderFile = path.basename(renamedFile.oldUri.fsPath);
         const includeEx = new RegExp("(?:<|\")(.*?" + oldHeaderFile + ")(?:\"|>)");
 
-        let includeMatches = includeEx.exec(textDocument.getText());
+        let includeMatches = includeEx.exec(this._CurrentTextDocument!.getText());
 
         // Rough check if the current file contains an include with the filename of the modified one.
         if(includeMatches !== null) {
@@ -90,10 +114,15 @@ export class Refactorer {
             if(isRelative)
                 newFilepath = path.relative(path.dirname(file.fsPath), renamedFile.newUri.fsPath);
 
-            let textEditor = await window.showTextDocument(textDocument, 1, true);
+            let textEditor = await window.showTextDocument(this._CurrentTextDocument!, {preview: true, preserveFocus: true});
             let res = await textEditor.edit(editRef => {
                 editRef.replace(new Range(textEditor.document.positionAt(index), textEditor.document.positionAt(index + includePath.length)), newFilepath);
             });
+
+            await textEditor.document.save();
+
+            if(current !== undefined && current.document.uri !== textEditor.document.uri)
+                await commands.executeCommand('workbench.action.closeActiveEditor');
 
             if(res)
                 window.showInformationMessage("File: " + file.fsPath + " modified!");
@@ -107,14 +136,14 @@ export class Refactorer {
      * @param file 
      */
     private async refactorMovedFile(file : { readonly oldUri: Uri, readonly newUri: Uri }) : Promise<void> {
-        let textDocument = await workspace.openTextDocument(file.newUri.fsPath);
-        let textEditor = await window.showTextDocument(textDocument, 1, true);
+        let current = window.activeTextEditor;
+        let textEditor = await window.showTextDocument(this._CurrentTextDocument!, {preview: true, preserveFocus: true});
 
         const includeEx = new RegExp('"(.*?)"$', "gm");
         let includeMatches : RegExpExecArray | null = null;
 
         do {
-            includeMatches = includeEx.exec(textDocument.getText());
+            includeMatches = includeEx.exec(this._CurrentTextDocument!.getText());
             if(includeMatches) {
                 const index = includeMatches.index + 1;
                 let fullIncludePath = path.resolve(path.dirname(file.oldUri.fsPath), includeMatches![1]);
@@ -137,6 +166,11 @@ export class Refactorer {
                 let res = await textEditor.edit(editRef => {
                     editRef.replace(new Range(textEditor.document.positionAt(index), textEditor.document.positionAt(index + includeMatches![1].length)), newRelativePath);
                 });
+
+                await textEditor.document.save();
+
+                if(current !== undefined && current.document.uri !== textEditor.document.uri)
+                    await commands.executeCommand('workbench.action.closeActiveEditor');
 
                 if(res)
                     window.showInformationMessage("File: " + file.newUri.fsPath + " modified!");
