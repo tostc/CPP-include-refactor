@@ -1,11 +1,12 @@
 import path = require("path");
-import { commands, FileType, Range, RelativePattern, TextDocument, Uri, ViewColumn, window, workspace } from "vscode";
+import { commands, FileType, Range, RelativePattern, TextDocument, Uri, ViewColumn, window, workspace, WorkspaceEdit } from "vscode";
 import { Settings } from "./settings";
 
 export class Refactorer {
     private static _HeaderFileExtRegex = new RegExp(".(hpp|h|hxx)$");
 
     private _CurrentTextDocument : TextDocument | null = null;
+    private _WorkspaceEdit : WorkspaceEdit | null = null;
 
     /**
      * @brief Begins the refactoring process of all the source files.
@@ -55,6 +56,8 @@ export class Refactorer {
         // TODO: Find the correct workspace.
         const folder = workspace.workspaceFolders![0];
         const files = await workspace.findFiles(new RelativePattern(folder, "**/*.{hpp,h,hxx,c,cpp,cxx}"));
+
+        this._WorkspaceEdit = new WorkspaceEdit();
         
         for (const file of files) {
             if(this.canIgnore(file))
@@ -72,6 +75,12 @@ export class Refactorer {
                 }
             }
         }
+
+        let res = await workspace.applyEdit(this._WorkspaceEdit);
+        if(res)
+            window.showInformationMessage("File(s) refactored!");
+        else
+            window.showErrorMessage("Failed to refactor file(s)!");
     }
 
     /**
@@ -82,7 +91,6 @@ export class Refactorer {
      */
     private async refactorFile(file : Uri, renamedFile : { readonly oldUri: Uri, readonly newUri: Uri }) : Promise<void> {
         // Gets the old header file name.
-        let current = window.activeTextEditor;
         let oldHeaderFile = path.basename(renamedFile.oldUri.fsPath);
         const includeEx = new RegExp("(?:<|\")(.*?" + oldHeaderFile + ")(?:\"|>)");
 
@@ -113,21 +121,8 @@ export class Refactorer {
 
             if(isRelative)
                 newFilepath = path.relative(path.dirname(file.fsPath), renamedFile.newUri.fsPath);
-
-            let textEditor = await window.showTextDocument(this._CurrentTextDocument!, {preview: true, preserveFocus: true});
-            let res = await textEditor.edit(editRef => {
-                editRef.replace(new Range(textEditor.document.positionAt(index), textEditor.document.positionAt(index + includePath.length)), newFilepath);
-            });
-
-            await textEditor.document.save();
-
-            if(current !== undefined && current.document.uri !== textEditor.document.uri)
-                await commands.executeCommand('workbench.action.closeActiveEditor');
-
-            if(res)
-                window.showInformationMessage("File: " + file.fsPath + " modified!");
-            else
-                window.showErrorMessage("Failed to modify " + file.fsPath + "!");
+         
+            this._WorkspaceEdit?.replace(file, new Range(this._CurrentTextDocument!.positionAt(index), this._CurrentTextDocument!.positionAt(index + includePath.length)), newFilepath);
         }
     }
 
@@ -136,9 +131,6 @@ export class Refactorer {
      * @param file 
      */
     private async refactorMovedFile(file : { readonly oldUri: Uri, readonly newUri: Uri }) : Promise<void> {
-        let current = window.activeTextEditor;
-        let textEditor = await window.showTextDocument(this._CurrentTextDocument!, {preview: true, preserveFocus: true});
-
         const includeEx = new RegExp('"(.*?)"$', "gm");
         let includeMatches : RegExpExecArray | null = null;
 
@@ -162,20 +154,7 @@ export class Refactorer {
                 }
 
                 const newRelativePath = path.relative(path.dirname(file.newUri.fsPath), fullIncludePath);
-
-                let res = await textEditor.edit(editRef => {
-                    editRef.replace(new Range(textEditor.document.positionAt(index), textEditor.document.positionAt(index + includeMatches![1].length)), newRelativePath);
-                });
-
-                await textEditor.document.save();
-
-                if(current !== undefined && current.document.uri !== textEditor.document.uri)
-                    await commands.executeCommand('workbench.action.closeActiveEditor');
-
-                if(res)
-                    window.showInformationMessage("File: " + file.newUri.fsPath + " modified!");
-                else
-                    window.showErrorMessage("Failed to modify " + file.newUri.fsPath + "!");
+                this._WorkspaceEdit?.replace(file.newUri, new Range(this._CurrentTextDocument!.positionAt(index), this._CurrentTextDocument!.positionAt(index + includeMatches![1].length)), newRelativePath);
             }
         } while (includeMatches);
     }
@@ -185,7 +164,7 @@ export class Refactorer {
      * @param renamedFile Modified file structure
      * @returns True if file is the same as renamdeFile.oldUri or renamedFile.newUri
      */
-     private isSameFile(file : Uri, renamedFile : { readonly oldUri: Uri, readonly newUri: Uri }) : boolean {
+    private isSameFile(file : Uri, renamedFile : { readonly oldUri: Uri, readonly newUri: Uri }) : boolean {
         return file.fsPath == renamedFile.oldUri.fsPath || file.fsPath == renamedFile.newUri.fsPath;
     }
 
