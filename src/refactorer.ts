@@ -1,5 +1,5 @@
 import path = require("path");
-import { commands, FileType, Range, RelativePattern, TextDocument, Uri, ViewColumn, window, workspace, WorkspaceEdit } from "vscode";
+import { commands, FileType, Range, RelativePattern, TextDocument, Uri, ViewColumn, window, workspace, WorkspaceEdit, WorkspaceFolder } from "vscode";
 import { Settings } from "./settings";
 
 export class Refactorer {
@@ -7,6 +7,7 @@ export class Refactorer {
 
     private _CurrentTextDocument : TextDocument | null = null;
     private _WorkspaceEdit : WorkspaceEdit | null = null;
+    private _Workspaces : Map<number, WorkspaceFolder> = new Map<number, WorkspaceFolder>();
 
     /**
      * @brief Begins the refactoring process of all the source files.
@@ -24,9 +25,10 @@ export class Refactorer {
         let ret : { oldUri: Uri, newUri: Uri }[] = [];
         
         for (const renamedFile of renamedFiles) {
+            this.checkAndAddWorkspace(renamedFile);
+
             try {
                 if((await workspace.fs.stat(renamedFile.newUri)).type == FileType.Directory) {
-                    // TODO: Scan dir for files.
                     let files = await workspace.fs.readDirectory(renamedFile.newUri);
                     for (const file of files) {
                         // We also want subdirectories.
@@ -49,13 +51,34 @@ export class Refactorer {
     }
 
     /**
+     * @brief Adds a workspace folder to the _Workspaces attribute.
+     * @param file 
+     */
+    private checkAndAddWorkspace(file : { readonly oldUri: Uri, readonly newUri: Uri }) : void {
+        let root = workspace.getWorkspaceFolder(file.oldUri);
+        if(root !== undefined) {
+            if(!this._Workspaces.has(root.index))
+                this._Workspaces.set(root.index, root);
+        }
+
+        root = workspace.getWorkspaceFolder(file.newUri);
+        if(root !== undefined) {
+            if(!this._Workspaces.has(root.index))
+                this._Workspaces.set(root.index, root);
+        }
+    }
+
+    /**
      * @brief Searches for source files which includes the given file.
      * @param renamedFile 
      */
     private async refactorIncludes(renamedFiles : { oldUri: Uri, newUri: Uri }[]) : Promise<void> {
-        // TODO: Find the correct workspace.
-        const folder = workspace.workspaceFolders![0];
-        const files = await workspace.findFiles(new RelativePattern(folder, "**/*.{hpp,h,hxx,c,cpp,cxx}"));
+        let files : Uri[] = [];
+        for (const workspaceRoot of this._Workspaces) {
+            let folders = await workspace.findFiles(new RelativePattern(workspaceRoot[1], "**/*.{hpp,h,hxx,c,cpp,cxx}"));
+            files.push(...folders);
+        }
+        this._Workspaces.clear();
 
         this._WorkspaceEdit = new WorkspaceEdit();
         
