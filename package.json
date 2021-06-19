@@ -1,5 +1,5 @@
 {
-  "name": "cpp-include-refactor",
+  "name": "vscl",
 	"displayName": "C++ include refactor",
 	"description": "Refactors all includes if you move or rename a file or directory.",
 	"version": "1.0.0",
@@ -10,6 +10,10 @@
 	"categories": [
 		"Formatters"
 	],
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/tostc/CPP-include-refactor/issues"
+	},
 	"keywords": [
 		"C",
 		"C++",
